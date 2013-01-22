@@ -57,9 +57,11 @@ var mapHeight = null;
 var size = 32;
 var sizeX = 24;
 var sizeY = 14;
-
+var screenComponents = [];
+var infobar = null;
+var infoWindow = null;
 var selectedField = null;
-
+var floors = new Object();
 var theGrid = new Array();
 
 var player = {x:null,y:null}
@@ -76,12 +78,11 @@ function start()
 	height= mapHeight+6*size;
 	
 	prepareGrid(sizeX,sizeY);
+	initScreenComponents();
 	
 	prepareScreen();	
 	updateScreen();
 }
-
-var floors = new Object();
 
 function initFloors(){
 	floors[Floor.LIVING] = [];
@@ -114,65 +115,124 @@ function updateScreen()
 	drawInfoBar();
 }
 
+function FloorComponent(floor,color)
+{
+	this.floor = floor;
+	this.x = 10;
+	this.y = 10;
+	this.width = 80;
+	this.height = 24;
+	this.color = color;	
+	
+	this.draw = function(context,x,y)
+	{	
+		x = x ? x + this.x : this.x;
+		y = y ? y + this.y : this.y;
+		
+		context.fillStyle="black";
+		context.font = "8px Verdana";
+		
+		context.fillStyle = this.color;			
+		context.fillRect(x,y,this.width,this.height);				
+		context.fillStyle="black";
+		context.fillText(this.floor.name,x+10,y+14);
+	};
+	
+};
+
+
+function updateInfoWindow() 
+{
+	infoWindow.childNodes = [];
+	if(selectedField)
+	{
+		for(var i=0; i<selectedField.floors.length; i++)
+		{
+			var color = null
+			if(selectedField.floors[i].type == Floor.SHOP){
+				color="red"
+			}else if(selectedField.floors[i].type == Floor.PUBLICS){
+				color="blue"
+			}else if(selectedField.floors[i].type == Floor.OFFICE){
+				color="yellow"
+			}else{
+				color="khaki"
+			}		
+			
+			var floorComponent = new FloorComponent(selectedField.floors[i],color);
+			floorComponent.y = infoWindow.height - 30 - i*28;
+			floorComponent.level = 2;
+			infoWindow.childNodes.push(floorComponent);
+		}
+	}
+}
+
+function ScreenComponent(x,y,width,height){
+	this.x = x;
+	this.y = y;
+	this.width = width;
+	this.height = height;
+	this.level = 0;
+	this.draw = function(ctx){};
+	this.childNodes = [];
+	this.drawChildNodes = function(context,x,y)
+	{
+		for(var i in this.childNodes){
+			this.childNodes[i].draw(context,x,y);			
+		}
+	};
+}
+
+function initScreenComponents()
+{
+	infoBar = new ScreenComponent(0,14*size,width,height-14*size);
+	infoBar.draw = function(context,x,y)
+	{
+		x = x ? x + this.x : this.x;
+		y = y ? y + this.y : this.y;
+		context.fillStyle="grey";
+		context.fillRect(x,y,this.width,2);
+		context.fillStyle="white";
+		context.fillRect(x,y+2,this.width,1);
+		context.fillStyle="lightgrey";
+		context.fillRect(x,y+3,this.width,this.height-3);
+		
+		this.drawChildNodes(context, x, y);
+	};
+	
+	infoWindow = new ScreenComponent(20,20,100,150);
+	infoWindow.level = 1;
+	infoWindow.draw = function(context,x,y)
+	{
+		x = x ? x + this.x : this.x;
+		y = y ? y + this.y : this.y;
+		context.fillStyle="darkgrey";
+		context.fillRect(x,y,this.width,this.height);
+		context.fillStyle="grey";
+		context.fillRect(x+2,y+2,this.width-4,this.height-4);
+		
+		this.drawChildNodes(context,x,y);		
+	};
+	
+	infoBar.childNodes.push(infoWindow);
+	
+	screenComponents.push(infoBar);
+		
+}
+
 function drawInfoBar(){
 
-	// draw bar
-	ctx.fillStyle="grey"
-	ctx.fillRect(0,14*size,width,2)
-	ctx.fillStyle="white"
-	ctx.fillRect(0,14*size+2,width,1)
-	ctx.fillStyle="lightgrey"
-	ctx.fillRect(0,14*size+3,width,height-14*size+3)
-	
-	// draw info window
-	ctx.fillStyle="darkgrey"
-	ctx.fillRect(20,14*size+23,100,height-(14*size+23+20))
-	ctx.fillStyle="grey"
-	ctx.fillRect(20+2,14*size+23+2,100-4,height-(14*size+23+20+4))
-	
-	ctx.font = "8px Verdana"
-	
-	if(selectedField != null){
+	for(var i in screenComponents){
+		screenComponents[i].draw(ctx);
+	}
 		
-		if( selectedField.explored){
-			// draw floors	
-			var we = 100-4-10;
-			var he = 24;
-			var bottom = height-50;
-				
-			for(var i=0; i<selectedField.floors.length; i++){
-				if(selectedField.floors[i].type == Floor.SHOP){
-					ctx.fillStyle="red"
-				}else if(selectedField.floors[i].type == Floor.PUBLICS){
-					ctx.fillStyle="blue"
-				}else if(selectedField.floors[i].type == Floor.OFFICE){
-					ctx.fillStyle="yellow"
-				}else{
-					ctx.fillStyle="khaki"
-				}
-				
-				ctx.fillRect(20+2+5,bottom-(i*(he+5)),we,he)
-				if(selectedField.floors[i].type != Floor.SHOP){
-					for(var j=0; j<3; j++){
-						ctx.fillStyle="black"
-						ctx.fillRect(j*28+20+2+5+3,bottom-(i*(he+5))+3,22,he-6)
-						ctx.fillStyle="white"
-						ctx.fillRect(j*28+20+2+5+4,bottom-(i*(he+5))+4,20,he-8)
-					}
-				}else{
-					ctx.fillStyle="black"
-					ctx.fillRect(20+2+5+3,bottom-(i*(he+5))+3,we-8,he-6)
-					ctx.fillStyle="white"
-					ctx.fillRect(20+2+5+4,bottom-(i*(he+5))+4,we-8,he-8)
-				}
-				ctx.fillStyle="black"
-				ctx.fillText(selectedField.floors[i].name,30,bottom-(i*(he+5))+14)
-			}	
-		}
+	if(selectedField != null){
+	
+		ctx.font = "8px Verdana";			
 		
 		// write info text		
-		ctx.fillStyle="black"
-		ctx.font = "10px Verdana"
+		ctx.fillStyle="black";
+		ctx.font = "10px Verdana";
 
 		var fieldName = "";
 		switch(selectedField.type){
@@ -419,7 +479,7 @@ function mouseMove(evt)
 	x = Math.floor((evt.pageX-canvas[0].offsetLeft)/size);
 	y = Math.floor((evt.pageY-canvas[0].offsetTop)/size);		
 	
-	if(x>=0 && x<=sizeX && y>=0 && y<=sizeY){
+	if((evt.pageY-canvas[0].offsetTop) <= mapHeight && x>=0 && x<=sizeX && y>=0 && y<=sizeY){
 		mouseOver = {x:x,y:y}
 	}else{		
 		mouseOver = null;
@@ -440,12 +500,14 @@ InfoBarWindow.prototype =
 	
 }
 
+
+
 function clickAt(x,y)
 {
 	var fieldX = Math.floor(x/size)
 	var fieldY = Math.floor(y/size)
 
-	if(fieldX>=0 && fieldX<=sizeX && fieldY>=0 && fieldY<=sizeY)
+	if(y <= mapHeight && fieldX>=0 && fieldX<=sizeX && fieldY>=0 && fieldY<=sizeY)
 	{
 		// klicked at the map!
 		if(fieldX == player.x && fieldY == player.y){
@@ -456,60 +518,14 @@ function clickAt(x,y)
 		}
 		
 		selectedField = theGrid[fieldX][fieldY]
+		updateInfoWindow();
 	}else{
 		// clicked at the infobar
-		
+		if(x >= infoWindow.x+infoBar.width && x <= infoWindow.x+infoBar.width+infoWindow.width && y >= infoWindow.y+infoBar.y && y <= infoWindow.y+infoBar.y+infoWindow.height)
+		{
+			alert(1)
+		}
 	}
 	
 	updateScreen();		
-}
-
-function getComponent(x,y) 
-{
-	var todo = new Array();	
-	var done = new Array();	
-	
-	todo.push(theGrid[x][y])
-	
-	while(todo.length > 0)
-	{
-		var current = todo.pop();				
-		for(var i in news){
-			try{
-				var field = theGrid[current.x+news[i].x][current.y+news[i].y]
-				if($.inArray(done,field) < 0 && $.inArray(todo,field) < 0){
-					todo.push(field)		
-				}
-			}
-			catch(e){}		
-		}
-		done.push(current)
-	}	
-	return done;
-}
-
-function getNewOwnerComponent(x,y,owner) 
-{
-	var todo = new Array();	
-	var done = new Array();
-	var news = new Array({x:-1,y:0},{x:1,y:0},{x:0,y:-1},{x:0,y:+1});
-	
-	todo.push(theGrid[x][y])
-	
-	while(todo.length > 0)
-	{
-		var current = todo.pop();				
-		for(var i in news){
-			try{
-				var field = theGrid[current.x+news[i].x][current.y+news[i].y]
-				if((null == field.owner || field.owner == owner) && $.inArray(done,field) < 0 && $.inArray(todo,field) < 0){
-					todo.push(field)		
-				}
-			}
-			catch(e){}		
-		}
-		
-		done.push(current)		
-	}	
-	return done;
 }
